@@ -60,38 +60,59 @@ const ScraperEngine = {
 
     /**
      * Performs AI Heuristic Analysis
-     * Focuses on code patterns, keywords, and security signatures
+     * Logic: Starts with a Baseline based on URL reputation.
      */
     analyze(url, html) {
         let riskScore = 0;
         let detectedFlags = [];
 
-        // 1. Textual Pattern Recognition (Cybersecurity Terms)
+        const isOfficialStore = url.includes('play.google.com/store/apps');
+        const isOfficialDev = url.toLowerCase().includes('com.google') || url.toLowerCase().includes('com.android');
+
+        // 1. BASELINE TRUST (The core fix for the "94% bug")
+        if (isOfficialStore) {
+            riskScore = 5; // Official store starts very safe
+            detectedFlags.push("STORE_OFFICIAL_REPUTATION");
+        } else {
+            riskScore = 55; // Unknown/Third-party links start with high risk
+            detectedFlags.push("UNVERIFIED_DISTRIBUTION_SOURCE");
+        }
+
+        // 2. TEXTUAL PATTERN RECOGNITION
         if (html) {
             const content = html.toLowerCase();
+
+            // Scam Identifiers
             this.config.keywords.high_risk.forEach(word => {
                 if (content.includes(word)) {
-                    riskScore += this.config.thresholds.high_risk_weight;
+                    riskScore += 30; // Heavy penalty
                     detectedFlags.push(`PATTERN_${word.toUpperCase().replace(/\s/g, '_')}`);
                 }
             });
 
+            // Trust Identifiers (Certifications)
             this.config.keywords.trust.forEach(word => {
                 if (content.includes(word)) {
-                    riskScore -= this.config.thresholds.trust_bonus;
+                    riskScore -= 15; // Reward
                     detectedFlags.push(`TRUST_${word.toUpperCase().replace(/\s/g, '_')}`);
                 }
             });
         }
 
-        // 2. Official Source Recognition
-        if (url.toLowerCase().includes('com.google') || url.toLowerCase().includes('com.android')) {
-            riskScore = 5;
-            detectedFlags.push("OFFICIAL_SOURCE_VERIFIED");
+        // 3. REPUTATION SCARS (Extra Logic)
+        if (!url.startsWith('https://')) {
+            riskScore += 20;
+            detectedFlags.push("UNSECURED_CONNECTION");
         }
 
-        const variance = Math.floor(Math.random() * 8);
-        riskScore = Math.min(Math.max(riskScore + variance, 5), 98);
+        if (isOfficialDev) {
+            riskScore = 2; // Verified Google apps are always top-tier
+            detectedFlags.push("DEVELOPER_VERIFIED");
+        }
+
+        // 4. SCORE NORMALIZATION
+        // Ensure score doesn't go below 2 or above 98
+        riskScore = Math.min(Math.max(riskScore, 2), 98);
         const safetyPercentage = 100 - riskScore;
 
         return {
